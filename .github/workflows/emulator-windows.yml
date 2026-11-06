@@ -1,0 +1,90 @@
+name: Emulator for Windows
+
+# Builds sdk/emulator for Windows with MSYS2 (UCRT64 + SDL2) and publishes a
+# zip that runs without installing anything: the exe, SDL2.dll, and a card
+# with the examples and sounds as real files (in the repo they are symlinks,
+# which a Windows checkout turns into small text files).
+#
+# The zip goes to the release "emulator-windows" and is replaced at every
+# build, so the download link in the documentation never changes:
+#   https://github.com/VILLO88/ORION_PDA/releases/download/emulator-windows/orion-emulator-windows.zip
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sdk/emulator/**'
+      - 'sdk/runtime/**'
+      - 'sdk/examples/**'
+      - 'sdk/sounds/**'
+      - '.github/workflows/emulator-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-SDL2
+
+      - name: Build
+        run: make -C sdk/emulator
+
+      - name: Pack
+        run: |
+          out=pkg/orion-emulator
+          mkdir -p "$out/card/apps"
+          cp sdk/emulator/orion-emu.exe "$out/"
+          # every DLL the exe loads from the MSYS2 tree; the Windows ones are
+          # already on every PC
+          ldd sdk/emulator/orion-emu.exe | awk '/ucrt64/ {print $3}' | xargs -r -I{} cp {} "$out/"
+          cp sdk/examples/*.lua "$out/card/apps/"
+          cp -r sdk/sounds "$out/card/sounds"
+          cp sdk/emulator/README-windows.txt "$out/README.txt"
+          ls -la "$out" "$out/card/apps"
+
+      - name: Smoke test (no screen, 5 s)
+        run: |
+          cd pkg/orion-emulator
+          export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
+          set +e
+          # a path with backslashes, like a file dropped on the exe
+          timeout 5 ./orion-emu.exe "$(cygpath -w "$PWD/card/apps/invaders.lua")" > log.txt 2>&1
+          rc=$?
+          set -e
+          cat log.txt
+          # 124 = still running when timeout stopped it, i.e. it started
+          if [ $rc -ne 124 ]; then echo "emulator exited with $rc"; exit 1; fi
+          grep -q 'card ".*/card"' log.txt || { echo "card not found from a Windows path"; exit 1; }
+          grep -q 'started' log.txt || { echo "the app did not start"; exit 1; }
+          rm log.txt
+
+      - name: Zip
+        run: |
+          cd pkg
+          zip -r -q ../orion-emulator-windows.zip orion-emulator
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: emulator-windows
+          name: ORION emulator for Windows
+          make_latest: false
+          files: orion-emulator-windows.zip
+          body: |
+            The ORION emulator for Windows 11: download `orion-emulator-windows.zip`, extract it, and double-click `orion-emu.exe` or drag an app (`.lua`) onto it. Nothing to install. The README inside explains the rest; the full guide is at https://orionpda.org/sdk.
+
+            This zip is rebuilt whenever the emulator changes. Built from commit ${{ github.sha }}.

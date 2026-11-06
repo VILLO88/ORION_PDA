@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.4",
+  "workspace.library": ["editor"],
+  "workspace.checkThirdParty": false,
+  "diagnostics.globals": ["orion", "init", "update", "close"],
+  "diagnostics.disable": ["redefined-local"],
+  "telemetry.enable": false
+}

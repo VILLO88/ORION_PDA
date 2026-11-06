@@ -1,0 +1,10 @@
+# build output
+emulator/orion-emu
+emulator/*.dSYM/
+tools/lualint
+tools/__pycache__/
+
+# data the apps write in the emulator's card
+emulator/card/apps/data/
+
+.DS_Store
