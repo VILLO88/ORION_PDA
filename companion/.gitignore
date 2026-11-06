@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+ci-artifacts/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Caches
+.wrangler/
+.vite/
+.electron/
+.npm/
+.eslintcache
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Env files (sicurezza — non committare segreti)
+.env
+.env.*
+!.env.example
+
+# Binari nativi pesanti — il CI li scarica al volo, in locale vanno
+# scaricati seguendo BUILD_WINDOWS.md / BUILD_LINUX.md. I dfu-util di
+# tutte le piattaforme sono piccoli (< 300 KB) e sono committati.
+src/main/resources/ffmpeg/**/ffmpeg
+src/main/resources/ffmpeg/**/ffmpeg.exe
+src/main/resources/ffmpeg/**/ffprobe
+src/main/resources/ffmpeg/**/ffprobe.exe
+
+# L'helper del Calendario lo costruisce `npm run build:calendario` dal sorgente
+# Swift che sta in src/main/calendario/: un binario compilato non si versiona,
+# si rifa'.
+src/main/resources/calendario/**/orion-calendario
+
+# Icone generate
+build/icon.iconset/
+build/icon.ico
+dist-prova/

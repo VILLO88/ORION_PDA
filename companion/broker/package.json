@@ -1,0 +1,9 @@
+{
+  "name": "orion-notion-broker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal stateless OAuth token broker for Orion Companion <-> Notion. Holds the Notion client_secret so the distributed desktop app never has to.",
+  "engines": {
+    "node": ">=18"
+  }
+}

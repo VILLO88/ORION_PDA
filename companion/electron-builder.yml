@@ -1,0 +1,116 @@
+appId: com.orion.companion
+productName: Orion Companion
+directories:
+  output: dist
+  buildResources: build
+files:
+  - "out/**/*"
+  - "package.json"
+# Native tools (dfu-util, ffmpeg/ffprobe, calendar helper) are listed per
+# platform below, in each platform's own extraResources. The code looks them
+# up in process.resourcesPath/<tool>/<plat>-<arch>/<bin>; see the README in
+# each src/main/resources/<tool>/ folder. They used to be copied whole from
+# here, so the Mac binaries (committed in the repo) ended up inside the
+# Windows and Linux packages too.
+# Licence texts next to the app (beside LICENSE.electron.txt on Windows and
+# Linux, in Contents/ on macOS): the GPL tools above must travel with theirs.
+extraFiles:
+  - from: LICENSE
+    to: LICENSE.orion-companion.txt
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+asar: true
+# pdfjs (conversione PDF) carica il worker via dynamic import di un .mjs:
+# il dynamic import ESM da dentro l'asar fallisce, quindi lo lasciamo
+# spacchettato in app.asar.unpacked. Vedi src/main/pdar/readers/pdf.ts.
+asarUnpack:
+  - "**/node_modules/pdfjs-dist/legacy/build/**"
+mac:
+  category: public.app-category.utilities
+  # ⚠️ Senza questa stringa macOS **termina l'app** appena tocca il Bluetooth,
+  # invece di chiedere il permesso: il sistema pretende che l'uso sia
+  # dichiarato nell'Info.plist. In sviluppo non si vede, perche' il permesso
+  # lo eredita Electron; si vede solo nel pacchetto, cioe' in mano all'utente.
+  extendInfo:
+    NSBluetoothAlwaysUsageDescription: >-
+      Orion Companion usa il Bluetooth per mandare note ed ebook al tuo
+      dispositivo ORION senza cavo.
+    # ⚠️ Due stringhe e non una: da macOS 14 il permesso di **lettura** degli
+    # eventi si chiama "full access" e vuole la chiave nuova; sui sistemi
+    # precedenti vale la vecchia. Se manca quella giusta, il sistema non
+    # chiede: termina l'app, come per il Bluetooth.
+    NSCalendarsFullAccessUsageDescription: >-
+      Orion Companion legge i calendari che scegli tu per copiarne gli
+      appuntamenti sul tuo dispositivo ORION. Restano sul tuo Mac e sul
+      dispositivo.
+    NSCalendarsUsageDescription: >-
+      Orion Companion legge i calendari che scegli tu per copiarne gli
+      appuntamenti sul tuo dispositivo ORION. Restano sul tuo Mac e sul
+      dispositivo.
+  icon: build/icon.icns
+  # Build NON firmato: nessun Apple Developer ID disponibile. L'utente
+  # dovrà fare right-click → Open al primo avvio (o `xattr -d
+  # com.apple.quarantine /Applications/Orion\ Companion.app`).
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  target:
+    - dmg
+    - zip
+  extraResources:
+    - from: src/main/resources/dfu-util
+      to: dfu-util
+      filter: ["darwin-*/**"]
+    - from: src/main/resources/ffmpeg
+      to: ffmpeg
+      filter: ["darwin-*/**"]
+    # Calendar helper, macOS only: built by `npm run build:calendario` from
+    # src/main/calendario/helper.swift (EventKit exists only on macOS).
+    - from: src/main/resources/calendario
+      to: calendario
+      filter: ["darwin-*/**"]
+win:
+  icon: build/icon.ico
+  # A zip instead of the "portable" target. The portable .exe unpacks itself
+  # into %TEMP% at every launch, and on Windows 11 (seen on 6/11/2026) the
+  # unsigned Electron ffmpeg.dll is blocked there: "ffmpeg.dll was not found".
+  # The installer works on the same PC. A zip is unpacked once into a folder
+  # the user chooses, so it stays portable without ever running from %TEMP%.
+  target:
+    - nsis
+    - zip
+  extraResources:
+    - from: src/main/resources/dfu-util
+      to: dfu-util
+      filter: ["win32-*/**"]
+    - from: src/main/resources/ffmpeg
+      to: ffmpeg
+      filter: ["win32-*/**"]
+linux:
+  icon: build/icon.png
+  extraResources:
+    - from: src/main/resources/dfu-util
+      to: dfu-util
+      filter: ["linux-*/**"]
+    - from: src/main/resources/ffmpeg
+      to: ffmpeg
+      filter: ["linux-*/**"]
+  target:
+    - AppImage
+    - deb
+  category: Utility
+deb:
+  # libusb-1.0-0 serve a dfu-util bundlato; gli altri sono dipendenze
+  # standard di electron raccomandate da electron-builder.
+  depends:
+    - libusb-1.0-0
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+publish: null

@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: theme("fontFamily.sans");
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Scrollbar discreta che cambia col tema. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 120, 130, 0.25);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 120, 130, 0.45);
+  background-clip: padding-box;
+}
+
+@layer components {
+  /* Card di base, look unico dark + light. Padding e gap li mette il chiamante. */
+  .ui-card {
+    @apply rounded-xl border border-zinc-200 bg-white
+           dark:border-zinc-800 dark:bg-zinc-900;
+  }
+
+  /* Pulsante secondario (ghost). */
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-lg border
+           border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium
+           text-zinc-700 transition-colors hover:bg-zinc-50
+           dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200
+           dark:hover:bg-zinc-800 disabled:opacity-50;
+  }
+
+  /* Pulsante accent (orange filled). */
+  .btn-accent {
+    @apply inline-flex items-center gap-2 rounded-lg bg-accent
+           px-3 py-1.5 text-sm font-medium text-white transition-colors
+           hover:bg-accent-hover disabled:opacity-50;
+  }
+
+  /* Voce attiva nella sidebar: pill accent. */
+  .sidebar-item-active {
+    @apply bg-accent-soft text-accent dark:bg-accent-soft dark:text-accent;
+  }
+  .sidebar-item-idle {
+    @apply text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900
+           dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50;
+  }
+}

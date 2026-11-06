@@ -1,0 +1,213 @@
+name: Orion Companion
+
+# Builds the Companion (companion/) for macOS, Windows and Linux and publishes
+# a release with all the packages.
+#
+#   - push a tag "companion-vX.Y.Z" -> release "Orion Companion X.Y.Z"
+#     (the tag must match companion/package.json, or nothing is published)
+#   - manual run (Actions tab) -> packages as run artifacts, no release
+#
+# It never runs on ordinary pushes, so it cannot get in the way of
+# emulator-windows.yml, which runs on pushes to main that touch sdk/.
+on:
+  push:
+    tags: ['companion-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag and package.json agree
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#companion-v}"
+          pkg=$(node -p "require('./companion/package.json').version")
+          echo "tag $tag, package.json $pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json $pkg"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  macos:
+    needs: check-version
+    runs-on: macos-latest          # Apple Silicon
+    defaults:
+      run:
+        working-directory: companion
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # not signed (no Developer ID)
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: companion/package-lock.json
+      - run: npm ci
+      - name: ffmpeg + ffprobe (osxexperts, static arm64)
+        run: |
+          dest=src/main/resources/ffmpeg/darwin-arm64
+          mkdir -p "$dest"
+          curl -fsSL -o ffmpeg.zip  https://www.osxexperts.net/ffmpeg71arm.zip
+          curl -fsSL -o ffprobe.zip https://www.osxexperts.net/ffprobe71arm.zip
+          unzip -o -q ffmpeg.zip  -d "$dest"
+          unzip -o -q ffprobe.zip -d "$dest"
+          rm -rf "$dest/__MACOSX"
+          chmod +x "$dest/ffmpeg" "$dest/ffprobe"
+          "$dest/ffmpeg" -version | head -n1
+      # dfu-util for macOS is in the repo; the calendar helper is compiled
+      # with swiftc by `npm run build`
+      - name: Package (dmg + zip)
+        run: npm run package:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            companion/dist/*.dmg
+            companion/dist/*-mac.zip
+
+  # ---------------------------------------------------------------------------
+  windows:
+    needs: check-version
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: companion
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: companion/package-lock.json
+      - run: npm ci
+      - name: ffmpeg + ffprobe (gyan.dev essentials)
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # gyan.dev first; when it is down (a 503 stopped the 0.12.2 build) the
+          # same builds from its author's GitHub mirror
+          try {
+            Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          } catch {
+            Write-Host "gyan.dev unavailable ($_), using github.com/GyanD/codexffmpeg"
+            $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest" -Headers @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
+            $asset = $rel.assets | Where-Object { $_.name -like "*essentials_build.zip" } | Select-Object -First 1
+            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ffmpeg.zip
+          }
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-extract
+          $binDir = Get-ChildItem -Path ffmpeg-extract -Directory | Select-Object -First 1
+          $dest = "src\main\resources\ffmpeg\win32-x64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "$($binDir.FullName)\bin\ffmpeg.exe"  $dest
+          Copy-Item "$($binDir.FullName)\bin\ffprobe.exe" $dest
+          & "$dest\ffmpeg.exe" -version | Select-Object -First 1
+      - name: dfu-util
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://dfu-util.sourceforge.net/releases/dfu-util-0.11-binaries.tar.xz" -OutFile dfu-util.tar.xz
+          tar -xf dfu-util.tar.xz
+          $dest = "src\main\resources\dfu-util\win32-x64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "dfu-util-0.11-binaries\win64\dfu-util.exe"  $dest
+          Copy-Item "dfu-util-0.11-binaries\win64\libusb-1.0.dll" $dest -ErrorAction SilentlyContinue
+          & "$dest\dfu-util.exe" --version
+      - name: icon.ico
+        shell: pwsh
+        run: magick build\icon.png -define icon:auto-resize=16,32,48,64,128,256 build\icon.ico
+      - name: Package (installer + zip)
+        run: npm run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            companion/dist/*.exe
+            companion/dist/*-win.zip
+
+  # ---------------------------------------------------------------------------
+  linux:
+    needs: check-version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: companion
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: companion/package-lock.json
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dfu-util libusb-1.0-0 fakeroot dpkg
+      - run: npm ci
+      - name: ffmpeg + ffprobe (static, johnvansickle)
+        run: |
+          dest=src/main/resources/ffmpeg/linux-x64
+          mkdir -p "$dest"
+          curl -fsSL -o ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          tar -xf ffmpeg.tar.xz
+          src=$(find . -maxdepth 1 -type d -name 'ffmpeg-*-amd64-static' | head -n1)
+          cp "$src/ffmpeg" "$src/ffprobe" "$dest/"
+          chmod +x "$dest/ffmpeg" "$dest/ffprobe"
+          "$dest/ffmpeg" -version | head -n1
+      - name: dfu-util (system binary; libusb is a dependency of the .deb)
+        run: |
+          dest=src/main/resources/dfu-util/linux-x64
+          mkdir -p "$dest"
+          cp "$(command -v dfu-util)" "$dest/dfu-util"
+          chmod +x "$dest/dfu-util"
+      - name: Package (AppImage + deb)
+        run: npm run package:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            companion/dist/*.AppImage
+            companion/dist/*.deb
+
+  # ---------------------------------------------------------------------------
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+      - run: ls -la packages
+      - name: Version
+        id: v
+        run: echo "version=${GITHUB_REF_NAME#companion-v}" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Orion Companion ${{ steps.v.outputs.version }}
+          files: packages/*
+          body: |
+            The desktop app for ORION: music, video and ebook conversion, files, notes, calendar and firmware updates.
+
+            | system | download |
+            |---|---|
+            | macOS (Apple Silicon) | the `.dmg` |
+            | Windows 10/11 | `Orion.Companion.Setup…exe` (installer) or the `-win.zip` (portable: extract it and run `Orion Companion.exe`) |
+            | Linux (x86_64) | the `.AppImage` or the `.deb` |
+
+            The builds are not signed. On macOS right-click the app and choose Open the first time; on Windows, if SmartScreen appears, click More info, then Run anyway. Details: [companion/INSTALL.md](https://github.com/VILLO88/ORION_PDA/blob/main/companion/INSTALL.md). What changed: [companion/CHANGELOG.md](https://github.com/VILLO88/ORION_PDA/blob/main/companion/CHANGELOG.md).
+
+            The packages contain FFmpeg, dfu-util and libusb under their own licences (GPL/LGPL): see [THIRD_PARTY_NOTICES.md](https://github.com/VILLO88/ORION_PDA/blob/main/companion/THIRD_PARTY_NOTICES.md).
