@@ -20,6 +20,7 @@ extraFiles:
   - from: THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
 asar: true
+afterPack: scripts/firma-adhoc.cjs
 # pdfjs (conversione PDF) carica il worker via dynamic import di un .mjs:
 # il dynamic import ESM da dentro l'asar fallisce, quindi lo lasciamo
 # spacchettato in app.asar.unpacked. Vedi src/main/pdar/readers/pdf.ts.
@@ -48,9 +49,10 @@ mac:
       appuntamenti sul tuo dispositivo ORION. Restano sul tuo Mac e sul
       dispositivo.
   icon: build/icon.icns
-  # Build NON firmato: nessun Apple Developer ID disponibile. L'utente
-  # dovrà fare right-click → Open al primo avvio (o `xattr -d
-  # com.apple.quarantine /Applications/Orion\ Companion.app`).
+  # Nessun Apple Developer ID: electron-builder non firma (identity: null) e
+  # scripts/firma-adhoc.cjs (afterPack) firma ad hoc l'intera app. Senza, la
+  # firma parziale di Electron fa dire a macOS "danneggiata" a chi la scarica.
+  # Al primo avvio: Impostazioni > Privacy e sicurezza > Apri comunque.
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false

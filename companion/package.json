@@ -1,6 +1,6 @@
 {
   "name": "orion-companion",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Desktop companion app for the Orion PDA V3",
   "homepage": "https://orionpda.org",
   "main": "./out/main/index.js",

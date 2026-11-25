@@ -1,6 +1,19 @@
 # Changelog
 
 
+## [0.13.1] — 25 novembre 2026
+
+**macOS: la 0.13.0 scaricata da GitHub risultava "danneggiata".** Non era il
+download: electron-builder non firmava (manca un Developer ID Apple) e restava
+la firma parziale che il linker mette sul binario di Electron, con il bundle
+non sigillato. Il `.dmg` costruito in casa partiva solo perche' non aveva la
+quarantena di chi scarica. Ora `scripts/firma-adhoc.cjs` (hook `afterPack`)
+firma ad hoc l'intera app: scaricata, macOS mostra il normale "sviluppatore
+non identificato", che si apre da Impostazioni → Privacy e sicurezza → Apri
+comunque (`INSTALL.md`). Per una 0.13.0 gia' installata:
+`xattr -cr "/Applications/Orion Companion.app"`. Windows e Linux non cambiano.
+
+
 ## [0.13.0] — 25 novembre 2026
 
 In breve: l'**App Store** delle app Lua (pubblicare, provare, installare,

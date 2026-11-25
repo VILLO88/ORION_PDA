@@ -25,13 +25,17 @@ Double-clicking the app icon will show a dialog like:
 > "Orion Companion" cannot be opened because the developer cannot be
 > verified.
 
-This is Gatekeeper, not a bug. Do one of the following:
+This is Gatekeeper, not a bug: the app is signed but not notarized by Apple
+(that needs a paid Apple Developer account). Do one of the following:
 
-**Option A — right-click → Open (one-time):**
-1. In Finder, locate the app in `/Applications`.
-2. **Right-click** the app icon → **Open**.
-3. The same warning appears, but now with an **Open** button at the
-   bottom. Click it. macOS remembers your choice for future launches.
+**Option A — System Settings (one-time):**
+1. Double-click the app once and close the warning.
+2. Open **System Settings → Privacy & Security**, scroll down: next to
+   *"Orion Companion" was blocked…* click **Open Anyway**, and confirm.
+   macOS remembers your choice for future launches.
+
+On macOS 14 and older, **right-click** the app → **Open** → **Open** does the
+same in one step.
 
 **Option B — terminal (faster for power users):**
 
@@ -40,6 +44,11 @@ xattr -dr com.apple.quarantine "/Applications/Orion Companion.app"
 ```
 
 Then double-click as normal.
+
+> ⚠️ **"Orion Companion is damaged and can't be opened"** — this is what
+> **0.13.0** downloaded from GitHub shows: its signature was incomplete. Option B
+> above opens it; from **0.13.1** the app is signed properly and shows the
+> normal warning instead.
 
 > ⚠️ **`-dr`, not `-d`.** Without `-r` the flag is cleared only on the bundle
 > itself, and the helper programs *inside* it keep theirs. The app opens, but
