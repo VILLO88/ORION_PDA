@@ -10,7 +10,10 @@ const APP_VERSION = JSON.stringify(pkg.version);
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    /* any-ascii and entities are ES modules only, and Electron 30 (Node 20)
+       cannot require() one: they go into the bundle instead (Wikipedia
+       converter, src/main/wiki). */
+    plugins: [externalizeDepsPlugin({ exclude: ["any-ascii", "entities"] })],
     build: {
       rollupOptions: {
         input: { index: resolve("src/main/index.ts") },

@@ -7,7 +7,7 @@ is reflective, with no backlight, and reads well in daylight.
 | folder | contents |
 |---|---|
 | [`sdk/`](sdk/) | the SDK for writing apps in Lua: emulator, runtime, tools, examples |
-| [`companion/`](companion/) | Orion Companion, the desktop app: music, video and ebook conversion, files, notes, calendar, firmware updates |
+| [`companion/`](companion/) | Orion Companion, the desktop app: music, video, ebook and Wikipedia conversion, files, notes, calendar, firmware updates, and the **App Store** for Lua apps (with a built-in ORION emulator) |
 | [`firmware/`](firmware/) | firmware updates |
 
 The documentation (guide and API reference, in English and Italian) is at
@@ -22,7 +22,8 @@ Nothing to install. On macOS and Linux the emulator is built from
 **Orion Companion** for macOS, Windows and Linux: download it from the
 [Releases](https://github.com/VILLO88/ORION_PDA/releases?q=companion&expanded=true)
 (look for "Orion Companion"). Installation notes are in
-[`companion/INSTALL.md`](companion/INSTALL.md).
+[`companion/INSTALL.md`](companion/INSTALL.md). Wrote an app? Publish it in
+the App Store from the Companion: [`companion/APP_STORE.md`](companion/APP_STORE.md).
 
 ## License
 

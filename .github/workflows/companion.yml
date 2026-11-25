@@ -200,7 +200,7 @@ jobs:
           name: Orion Companion ${{ steps.v.outputs.version }}
           files: packages/*
           body: |
-            The desktop app for ORION: music, video and ebook conversion, files, notes, calendar and firmware updates.
+            The desktop app for ORION: music, video, ebook and Wikipedia conversion, files, notes, calendar, firmware updates, and the App Store for Lua apps, with a built-in ORION emulator to try them.
 
             | system | download |
             |---|---|

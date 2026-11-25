@@ -1,6 +1,6 @@
 {
   "name": "orion-companion",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "description": "Desktop companion app for the Orion PDA V3",
   "homepage": "https://orionpda.org",
   "main": "./out/main/index.js",
@@ -22,11 +22,16 @@
     "package:linux": "npm run build && electron-builder --linux",
     "build:calendario": "node scripts/build-calendario.mjs",
     "prova:cal": "tsx scripts/prova-cal.ts /tmp/prova_ts.cal && ../prove_pc/cal_file --generico /tmp/prova_ts.cal && tsx scripts/prova-ics.ts /tmp/prova_ics.cal && ../prove_pc/cal_file --generico /tmp/prova_ics.cal",
-    "prova": "npm run prova:cal && tsx scripts/prova-ble.ts"
+    "prova": "npm run prova:cal && tsx scripts/prova-ble.ts",
+    "emu:copia": "node -e \"require('fs').copyFileSync('../../SDK/emulator/web/dist/orion-emu.mjs','src/renderer/src/emu/orion-emu.mjs')\"",
+    "wiki": "tsx scripts/wiki.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
+    "any-ascii": "^0.3.3",
+    "entities": "^9.0.0",
+    "fzstd": "^0.1.1",
     "ical.js": "^2.2.1",
     "jimp": "^0.22.12",
     "jszip": "^3.10.1",

@@ -87,6 +87,9 @@ import {
   isDirectory,
 } from "./ipc/fs";
 import { convertEbook, previewEbook } from "./ipc/ebook";
+import { wikiCancel, wikiConvert, wikiInfo, wikiSpazio } from "./ipc/wiki";
+import * as storeAccount from "./store/account";
+import * as store from "./store/store";
 import {
   anteprimaCal,
   calInMemoria,
@@ -137,6 +140,14 @@ import type {
   DeviceStorageRequest,
   EbookConvertRequest,
   EbookPreviewRequest,
+  WikiConvertRequest,
+  StoreDecideRequest,
+  StoreInstallRequest,
+  StoreListRequest,
+  StorePublishRequest,
+  StoreReportRequest,
+  StoreReviewRequest,
+  StoreUninstallRequest,
   FilesCopyRequest,
   FilesDeleteRequest,
   FilesListRequest,
@@ -534,6 +545,49 @@ app.whenReady().then(() => {
   ipcMain.handle("ebook:preview", (_e, req: EbookPreviewRequest) =>
     previewEbook(req),
   );
+
+  // App Store: Lua apps from everyone, moderated. See src/main/store and store/.
+  ipcMain.handle("store:account", () => storeAccount.account());
+  ipcMain.handle("store:signIn", () => storeAccount.signIn());
+  ipcMain.handle("store:signOut", () => storeAccount.signOut());
+  ipcMain.handle("store:list", (_e, req: StoreListRequest) => store.list(req));
+  ipcMain.handle("store:detail", (_e, slug: string) => store.detail(slug));
+  ipcMain.handle("store:reviews", (_e, slug: string) => store.reviews(slug));
+  ipcMain.handle("store:review", (_e, req: StoreReviewRequest) => store.review(req));
+  ipcMain.handle("store:deleteReview", (_e, slug: string) => store.deleteReview(slug));
+  ipcMain.handle("store:report", (_e, req: StoreReportRequest) => store.report(req));
+  ipcMain.handle("store:installed", (_e, mountPath: string) => store.installed(mountPath));
+  ipcMain.handle("store:install", (_e, req: StoreInstallRequest) => store.install(req));
+  ipcMain.handle("store:uninstall", (_e, req: StoreUninstallRequest) => store.uninstall(req));
+  ipcMain.handle("store:pickSource", () => store.pickSource());
+  ipcMain.handle("store:readSource", (_e, p: string) => store.readSource(p));
+  ipcMain.handle("store:publish", (_e, req: StorePublishRequest) => store.publish(req));
+  ipcMain.handle("store:pickScreenshots", () => store.pickScreenshots());
+  ipcMain.handle("store:screenshot", (_e, slug: string, version: string, i: number) => store.screenshot(slug, version, i));
+  ipcMain.handle("store:tryFiles", (_e, slug: string, version?: string) => store.tryFiles(slug, version));
+  ipcMain.handle("store:packageFiles", (_e, slug: string, version?: string) => store.packageFiles(slug, version));
+  ipcMain.handle("store:localFiles", (_e, p: string, ex?: string[]) => store.localFiles(p, ex));
+  ipcMain.handle("store:saveCapture", (_e, d: string) => store.saveCapture(d));
+  ipcMain.handle("store:myApps", () => store.myApps());
+  ipcMain.handle("store:withdraw", (_e, id: number) => store.withdraw(id));
+  ipcMain.handle("store:queue", () => store.queue());
+  ipcMain.handle("store:decide", (_e, req: StoreDecideRequest) => store.decide(req));
+  ipcMain.handle("store:setHidden", (_e, slug: string, hidden: boolean) => store.setHidden(slug, hidden));
+  ipcMain.handle("store:hideReview", (_e, id: number) => store.hideReview(id));
+  ipcMain.handle("store:reports", () => store.reports());
+  ipcMain.handle("store:resolveReport", (_e, id: number) => store.resolveReport(id));
+  ipcMain.handle("store:ban", (_e, login: string, banned: boolean) => store.ban(login, banned));
+
+  // Wikipedia: a Kiwix ZIM -> the ORION Wiki format. See src/main/wiki.
+  ipcMain.handle("wiki:info", (_e, zimPath: string) => wikiInfo(zimPath));
+  ipcMain.handle("wiki:space", (_e, dir: string) => wikiSpazio(dir));
+  ipcMain.handle("wiki:convert", async (e, req: WikiConvertRequest) => {
+    const sender = e.sender;
+    return wikiConvert(req, (ev) => {
+      if (!sender.isDestroyed()) sender.send("wiki:progress", ev);
+    });
+  });
+  ipcMain.handle("wiki:cancel", () => wikiCancel());
 
   // Calendario: Mac -> .cal -> microSD. Vedi PDAV3/CALENDARIO.md.
   /* Il lato disco del Bluetooth: lo specchio delle note, e i byte dei file

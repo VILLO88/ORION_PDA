@@ -26,7 +26,9 @@ export type ActivityKind =
   | "notion-sync"
   | "files-upload"
   | "files-delete"
-  | "firmware-flash";
+  | "firmware-flash"
+  | "wiki-convert"
+  | "store-install";
 
 export type ActivityStatus = "ok" | "error";
 

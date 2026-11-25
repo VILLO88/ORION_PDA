@@ -11,7 +11,8 @@
  *    sorgente e destinazione siano dentro `<mount>/NOTE/`, con `mount`
  *    appartenente a un device Orion connesso. Nessun path arbitrario
  *    sull'host.
- *  - Sui file accettiamo solo `.txt`. Sulle cartelle nessun filtro di
+ *  - Sui file accettiamo solo le note: `.txt` e `.md` (dal firmware del
+ *    25/11/2026), `.enc` dentro `PRIVATE`. Sulle cartelle nessun filtro di
  *    estensione (sono solo nomi).
  *
  * ⚠️ **La categoria protetta** (9 ottobre 2026). Dentro `NOTE/PRIVATE` le note
@@ -74,6 +75,7 @@ import { bleMirrorEsiste, bleMirrorRoot } from "./bleLocal";
 import {
   decryptNote,
   isProtectedPath,
+  isPlainNoteExt,
   isProtectedRoot,
   PROTECTED_DIR,
   PROTECTED_EXT,
@@ -90,7 +92,15 @@ import {
 } from "../notes/vault";
 
 const NOTES_SUBDIR = "NOTE";
-const ALLOWED_EXT = ".txt";
+/** L'estensione di una nota protetta che esce in chiaro (backup a deposito
+ *  aperto): il dispositivo non fa `.md` dentro `PRIVATE`. */
+const PLAIN_OUT_EXT = ".txt";
+
+/** Una nota, di qualunque zona: `.txt`, `.md` o `.enc`. Quale estensione
+ *  vale DOVE lo decide chi chiama (`buildTree`, `readNote`). */
+function isNoteExt(ext: string): boolean {
+  return isPlainNoteExt(ext) || ext.toLowerCase() === PROTECTED_EXT;
+}
 
 // ---------------------------------------------------------------------------
 //  Safety helpers (scoped to <mount>/NOTE/)
@@ -154,7 +164,9 @@ async function buildTree(absDir: string, noteRoot: string): Promise<NoteTreeFold
   const name = absDir === noteRoot ? "" : basename(absDir);
   const rel = absDir === noteRoot ? "" : relative(noteRoot, absDir);
   const protetta = isProtectedPath(noteRoot, absDir);
-  const ext = protetta ? PROTECTED_EXT : ALLOWED_EXT;
+  /* Le estensioni che il dispositivo elenca in questa cartella. */
+  const ammessa = (e: string): boolean =>
+    protetta ? e === PROTECTED_EXT : isPlainNoteExt(e);
   const folder: NoteTreeFolder = {
     kind: "folder",
     name,
@@ -180,7 +192,7 @@ async function buildTree(absDir: string, noteRoot: string): Promise<NoteTreeFold
     try {
       if (d.isDirectory()) {
         folder.children.push(await buildTree(full, noteRoot));
-      } else if (d.isFile() && extname(d.name).toLowerCase() === ext) {
+      } else if (d.isFile() && ammessa(extname(d.name).toLowerCase())) {
         const s = await stat(full);
         folder.children.push({
           kind: "file",
@@ -255,8 +267,8 @@ export async function readNote(req: NoteReadRequest): Promise<NoteReadResponse> 
     if (!chiave) throw new Error("PRIVATE is locked: unlock it first.");
     return { content: decryptNote(await readFile(safePath), chiave), fallbackEncoding: false };
   }
-  if (ext !== ALLOWED_EXT) {
-    throw new Error("Refused: only .txt notes are allowed");
+  if (!isPlainNoteExt(ext)) {
+    throw new Error("Refused: only .txt and .md notes are allowed");
   }
   const buf = await readFile(safePath);
   try {
@@ -324,7 +336,7 @@ async function copiaNota(
     const testo = decryptNote(await readFile(devicePath), chiave);
     const { dir, name } = parse(join(targetRoot, rel));
     await ensureDir(dir);
-    const dest = uniqueTargetPath(join(dir, name + ALLOWED_EXT));
+    const dest = uniqueTargetPath(join(dir, name + PLAIN_OUT_EXT));
     await writeFile(dest, testo, "utf8");
     return { dest, cifrata: false };
   }
@@ -336,8 +348,7 @@ async function copiaNota(
 }
 
 export async function backupNote(req: NoteBackupRequest): Promise<NoteBackupResponse> {
-  const ext = extname(req.devicePath).toLowerCase();
-  if (ext !== ALLOWED_EXT && ext !== PROTECTED_EXT) {
+  if (!isNoteExt(extname(req.devicePath))) {
     throw new Error("Refused: only notes");
   }
   const noteRoot = await assertInsideNoteDir(req.devicePath);
@@ -451,7 +462,9 @@ export async function notesRename(req: NoteRenameRequest): Promise<NoteRenameRes
   if (isProtectedRoot(noteRoot, req.from)) {
     throw new Error("Refused: PRIVATE cannot be renamed — the device knows it by that name.");
   }
-  // Un file tiene la sua estensione: .txt, o .enc dentro PRIVATE.
+  // Un file tiene la sua estensione: .txt o .md, o .enc dentro PRIVATE.
+  // Da .txt a .md si passa sul dispositivo creando una nota nuova, non qui:
+  // cambiare formato con un rename sarebbe una sorpresa per chi rinomina.
   const fromStat = await stat(req.from);
   if (
     fromStat.isFile() &&
@@ -482,11 +495,7 @@ async function copyRecursive(src: string, dst: string): Promise<void> {
       if (e.name.startsWith(".")) continue;
       // dentro NOTE/ filtra le note (e ricorsione su folder). Le due zone
       // non si mescolano: lo garantisce `assertStessaZona` a monte.
-      if (
-        e.isFile() &&
-        extname(e.name).toLowerCase() !== ALLOWED_EXT &&
-        extname(e.name).toLowerCase() !== PROTECTED_EXT
-      ) continue;
+      if (e.isFile() && !isNoteExt(extname(e.name))) continue;
       await copyRecursive(join(src, e.name), join(dst, e.name));
     }
   } else {
@@ -517,8 +526,7 @@ export async function notesCopy(req: NoteCopyRequest): Promise<NoteCopyResponse>
   await assertInsideNoteDir(req.dstDir);
   assertStessaZona(noteRoot, req.sourcePath, req.dstDir);
   const srcStat = await stat(req.sourcePath);
-  const srcExt = extname(req.sourcePath).toLowerCase();
-  if (srcStat.isFile() && srcExt !== ALLOWED_EXT && srcExt !== PROTECTED_EXT) {
+  if (srcStat.isFile() && !isNoteExt(extname(req.sourcePath))) {
     throw new Error("Refused: only notes");
   }
   const dstInitial = join(req.dstDir, basename(req.sourcePath));

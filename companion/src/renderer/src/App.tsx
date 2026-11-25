@@ -13,9 +13,11 @@ import NotesPage from "./pages/NotesPage";
 import MusicPage from "./pages/MusicPage";
 import VideoPage from "./pages/VideoPage";
 import EbookPage from "./pages/EbookPage";
+import WikiPage from "./pages/WikiPage";
 import CalendarPage from "./pages/CalendarPage";
 import FilesPage from "./pages/FilesPage";
 import FirmwarePage from "./pages/FirmwarePage";
+import StorePage from "./pages/StorePage";
 import PlaceholderPage from "./components/PlaceholderPage";
 
 type PageKey = (typeof SIDEBAR_ITEMS)[number]["key"];
@@ -28,10 +30,12 @@ const PAGE_META: Record<
   device:   { title: "Device",   subtitle: "Connected USB MSC volumes recognized as Orion." },
   notes:    { title: "Notes",    subtitle: "Backup and sync your notes, over USB or Bluetooth." },
   ebooks:   { title: "Ebooks",   subtitle: "Convert EPUB / PDF / Markdown to .pdar." },
+  wiki:     { title: "Wikipedia", subtitle: "Convert a Kiwix ZIM for the wiki app, to read offline." },
   music:    { title: "Music",    subtitle: "Convert and upload MP3 to the device." },
   video:    { title: "Video",    subtitle: "Convert MP4 / MKV to the .av format." },
   calendar: { title: "Calendar", subtitle: "Send your Mac calendar to the device." },
   files:    { title: "Files",    subtitle: "Browse, upload, delete files on the device SD card." },
+  store:    { title: "App Store", subtitle: "Lua apps for ORION: install, rate, comment — and publish your own." },
   firmware: { title: "Firmware", subtitle: "Update the Orion firmware via DFU." },
 };
 
@@ -57,8 +61,10 @@ const Shell = () => {
       case "music":    return <MusicPage />;
       case "video":    return <VideoPage />;
       case "ebooks":   return <EbookPage />;
+      case "wiki":     return <WikiPage />;
       case "calendar": return <CalendarPage />;
       case "files":    return <FilesPage />;
+      case "store":    return <StorePage />;
       case "firmware": return <FirmwarePage />;
       case "calendar":
         return (

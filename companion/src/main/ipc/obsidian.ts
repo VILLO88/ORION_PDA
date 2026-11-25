@@ -1,6 +1,15 @@
 /**
  * Sincronizzazione bidirezionale tra le note del device (<mount>/NOTE/, file
- * .txt) e una vault di Obsidian (cartella di file .md scelta dall'utente).
+ * .txt o .md) e una vault di Obsidian (cartella di file .md scelta dall'utente).
+ *
+ * ⚠️ Dal firmware del 25/11/2026 il dispositivo ha anche note `.md`, con
+ * un'anteprima renderizzata. Due conseguenze qui:
+ *  - una nota che arriva **nuova** da Obsidian nasce sul dispositivo come
+ *    `.md` (e' Markdown, e cosi' si vede renderizzata). Quelle gia' arrivate
+ *    come `.txt` restano `.txt`: si scrive nel file che c'e';
+ *  - `foo.txt` e `foo.md` nella stessa cartella del dispositivo hanno la
+ *    stessa chiave `foo`, e la vault ne ha uno solo. Non si sceglie a caso:
+ *    la chiave si salta, con un errore che dice di rinominarne una.
  *
  * Modello:
  *  - Una "nota" è identificata dalla sua `relKey` = path relativo SENZA
@@ -161,12 +170,17 @@ async function collectDevice(
   mountPath: string,
   noteRoot: string,
   aperto: boolean,
-): Promise<Map<string, SideFile>> {
+): Promise<{ map: Map<string, SideFile>; doppie: Set<string> }> {
   const out = new Map<string, SideFile>();
+  const doppie = new Set<string>();
+  const viste = new Set<string>();
   const { notes } = await listNotes({ mountPath });
   for (const n of notes) {
     const protetta = n.protected || isProtectedKey(toKey(n.relPath));
     if (protetta && !aperto) continue;
+    const k = toKey(n.relPath);
+    if (viste.has(k)) doppie.add(k);
+    viste.add(k);
     try {
       let buf = await readFile(n.devicePath);
       if (protetta) {
@@ -187,7 +201,7 @@ async function collectDevice(
       // file sparito tra list e read: skip
     }
   }
-  return out;
+  return { map: out, doppie };
 }
 
 async function collectVault(
@@ -258,7 +272,7 @@ export async function syncObsidian(
   const nextEntries: Manifest["entries"] = {};
 
   const aperto = vaultUnlocked(noteRoot);
-  const [deviceMap, vaultMap] = await Promise.all([
+  const [{ map: deviceMap, doppie }, vaultMap] = await Promise.all([
     collectDevice(mountPath, noteRoot, aperto),
     collectVault(vaultPath, aperto),
   ]);
@@ -277,6 +291,14 @@ export async function syncObsidian(
   const keys = new Set<string>([...deviceMap.keys(), ...vaultMap.keys()]);
 
   for (const key of keys) {
+    if (doppie.has(key)) {
+      res.errors.push({
+        relKey: key,
+        message: `Both "${key}.txt" and "${key}.md" are on the device: rename one of them.`,
+      });
+      if (prev[key]) nextEntries[key] = prev[key];
+      continue;
+    }
     try {
       const d = deviceMap.get(key);
       const v = vaultMap.get(key);
@@ -341,7 +363,7 @@ export async function syncObsidian(
           await rm(v.path, { force: true });
           res.deletedVault.push(key);
         } else {
-          await writeDevice(noteRoot, deviceNotePath(noteRoot, key), v.buf);
+          await writeDevice(noteRoot, deviceNotePath(noteRoot, key, ".md"), v.buf);
           res.pulled.push(key);
           nextEntries[key] = { hash: v.hash, syncedAt: now() };
         }

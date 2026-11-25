@@ -165,6 +165,19 @@ Replug the device, you're done.
 
 ---
 
+## App Store
+
+Browsing and installing apps needs an internet connection; signing in is
+needed only to rate, comment or publish (with a GitHub account, in your
+browser). Apps are installed over USB (ORION in USB mode) or over Bluetooth
+(slower, ~1 kB/s: a small app takes seconds; for big ones the app suggests the
+cable). Over Bluetooth, keep ORION on its home screen while installing; with
+firmware 0.3.0 you can also stay in Apps.
+
+**Try** runs an app in the built-in ORION emulator, without the device. The
+first key or click in the emulator turns its sound on (browsers start audio
+only after a gesture).
+
 ## External tools the app uses
 
 For the time being, the build uses **ffmpeg + ffprobe + dfu-util**

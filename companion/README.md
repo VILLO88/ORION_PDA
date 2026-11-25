@@ -7,20 +7,25 @@ Cross-platform: Windows · macOS (Apple Silicon) · Linux (x86_64).
 > [Releases of the ORION_PDA repository](https://github.com/VILLO88/ORION_PDA/releases?q=companion&expanded=true).
 > See [CHANGELOG.md](CHANGELOG.md) for recent changes,
 > [INSTALL.md](INSTALL.md) for end-user installation,
+> [APP_STORE.md](APP_STORE.md) for publishing Lua apps in the App Store,
 > [BUILD_WINDOWS.md](BUILD_WINDOWS.md) / [BUILD_LINUX.md](BUILD_LINUX.md)
 > for cross-platform build notes.
 
 ## Features
 
-| Tab          | What it does                                                                |
-| ------------ | --------------------------------------------------------------------------- |
-| **Home**     | Connected device + storage overview, always visible.                        |
-| **Notes**    | Read-only backup of `/NOTE/*.txt` from the SD.                              |
-| **Files**    | Drag/drop + clipboard manager for arbitrary files on the SD card.           |
-| **MP3**      | Convert audio via `ffmpeg` (loudnorm -14 LUFS, 48 kHz, libmp3lame VBR q=2). |
-| **Video**    | Convert `.mp4/.mkv/.mov/.avi` → `.av` (gray 1bpp dither + PCM s16le audio). |
-| **Ebook**    | Convert EPUB / PDF / Markdown / TXT → `.pdar`, pre-paginated for the Sharp LS032 536×336 display. |
-| **Firmware** | USB DFU update via `dfu-util`, with SD-driven auto-update trigger.          |
+| Tab           | What it does |
+| ------------- | ------------ |
+| **Home**      | Connected device + storage overview, recent activity. |
+| **Device**    | The connected ORION volumes. |
+| **Notes**     | The `/NOTE` tree (`.txt` and `.md`, with a Rendered / Source preview for Markdown): copy, move, rename, back up; protected notes (`PRIVATE`); two-way sync with an Obsidian vault or Notion; also over Bluetooth. |
+| **Ebooks**    | Convert EPUB / PDF / Markdown / TXT → `.pdar`, pre-paginated for the 536×336 display; to the card, a folder or over Bluetooth. |
+| **Wikipedia** | Convert a Kiwix `.zim` for ORION's `wiki` app, to read offline (needs ORION firmware 0.3.0). |
+| **Music**     | Convert audio via `ffmpeg` (loudnorm -14 LUFS, 48 kHz, libmp3lame VBR q=2), with cover search. |
+| **Video**     | Convert `.mp4/.mkv/.mov/.avi` → `.av` (1-bit dither + PCM audio). |
+| **Calendar**  | Send your computer's calendar (and `.ics` files) to ORION. |
+| **Files**     | Drag/drop + clipboard manager for any file on the SD card. |
+| **App Store** | Lua apps for ORION: browse, **try them in the built-in emulator**, install over USB or Bluetooth, rate and comment; publish your own (sign in with GitHub, every version is reviewed by a moderator). See [APP_STORE.md](APP_STORE.md). |
+| **Firmware**  | USB DFU update via `dfu-util`, with SD-driven auto-update trigger. |
 
 ## Stack
 
@@ -97,6 +102,7 @@ src/
 │   ├── firmware/  DFU wrapper, SD-driven auto-update, path resolver
 │   ├── ffmpeg/    ffmpeg/ffprobe path resolver (bundle → PATH → well-known)
 │   ├── ipc/       per-feature IPC handlers (files, mp3, video, ebook, notes, …)
+│   ├── store/     App Store client: GitHub sign-in, install on the card, publish
 │   └── resources/ bundled native binaries (gitignored heavy ones)
 ├── preload/       Context bridge: type-safe API exposed to renderer
 ├── shared/        IPC types shared between main and renderer
@@ -106,9 +112,14 @@ src/
         ├── App.tsx
         ├── components/
         ├── pages/   one component per top-level tab
-        ├── lib/     api wrapper, DeviceContext, ActivityContext, …
+        ├── lib/     api wrapper, DeviceContext, ActivityContext, emulator, …
+        ├── emu/     ORION emulator as WebAssembly (generated from the SDK)
         └── styles/  Tailwind globals
 ```
+
+The App Store's server (a Cloudflare Worker) is run by the ORION project and
+is not part of this source: the app talks to it over HTTPS. A fork can point
+the app to another instance with the `ORION_STORE_URL` environment variable.
 
 ## Native binaries (for local builds)
 
@@ -130,7 +141,13 @@ Full per-platform instructions are in `BUILD_WINDOWS.md` /
 - Renderer is sandboxed; no `nodeIntegration`, no `remote`.
 - All Node access is mediated by typed IPC channels declared in
   `src/shared/ipc-types.ts`, exposed through the preload script.
-- A strict CSP is set in `src/renderer/index.html`.
+- A strict CSP is set in `src/renderer/index.html`. It allows
+  `'wasm-unsafe-eval'` for the built-in emulator (WebAssembly) and images from
+  `data:` and GitHub avatars only.
+- App Store packages are checked against their SHA-256 before anything is
+  written to the card, and may only write `/apps/<name>.lua` and
+  `/apps/data/<name>/`. Markdown from notes and app pages is rendered with
+  raw HTML escaped and links made inert.
 - Native binaries are spawned by absolute path (no shell), with no user
   input concatenated into argv.
 

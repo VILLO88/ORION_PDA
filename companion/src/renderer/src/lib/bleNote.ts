@@ -37,7 +37,9 @@ type Dice = (s: string) => void;
 
 function eNota(nome: string): boolean {
   const n = nome.toLowerCase();
-  return n.endsWith(".txt") || n.endsWith(".enc");
+  /* `.md` dal firmware del 25/11/2026. La bozza di una `.md` sul
+     dispositivo e' `nome.md.tmp`: finisce in `.tmp`, quindi resta fuori. */
+  return n.endsWith(".txt") || n.endsWith(".md") || n.endsWith(".enc");
 }
 
 /** Lo specchio è valido solo dopo un allineamento riuscito in questa

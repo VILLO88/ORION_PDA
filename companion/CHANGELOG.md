@@ -1,6 +1,125 @@
 # Changelog
 
 
+## [0.13.0] — 25 novembre 2026
+
+In breve: l'**App Store** delle app Lua (pubblicare, provare, installare,
+votare, commentare), l'**emulatore di ORION dentro la Companion**, le **note
+in Markdown** e la pagina **Wikipedia**.
+
+⚠️ **Firmware.** App Store via USB ed emulatore vanno col firmware di oggi.
+Il firmware **0.3.0, in arrivo**, serve a tre cose: l'app `wiki` che legge
+cio' che converte la pagina Wikipedia (la conversione si fa gia' adesso), le
+note `.md` create e mostrate renderizzate sul dispositivo (la Companion le
+gestisce comunque), e le rifiniture dell'installazione via Bluetooth, che
+intanto funziona con ORION sulla home.
+
+**App Store** (pagina nuova nella barra laterale). Chi scrive app Lua per ORION
+le pubblica gratis dalla Companion; un moderatore approva ogni versione; poi
+tutti le trovano, le installano sulla card con un clic, le votano (1-5, un voto
+per account) e le commentano.
+
+- **Server**: un Worker Cloudflare (D1 per app, versioni, voti, commenti,
+  segnalazioni; R2 per i pacchetti), gestito dal progetto e fuori dal
+  sorgente pubblico. La Companion punta a
+  `orion-store.villanimatteo88.workers.dev` (`ORION_STORE_URL` per un'altra
+  istanza).
+- **Account**: login con GitHub, col giro del loopback come per Notion. Il
+  token di GitHub non arriva all'app; quello dello store e' tenuto con
+  `safeStorage`, e il server ne conserva solo lo SHA-256.
+- **Moderazione prima della pubblicazione**, perche' un'app su ORION puo'
+  scrivere su tutta la microSD con `shared/`. Il server legge il codice e
+  segnala `shared` (non per `shared/sounds/`, i suoni di sistema che ogni app legge), `serial`, `gpio`, `i2c`, `ble`, `mesh`, codice compilato:
+  il moderatore lo vede in coda, l'utente sulla pagina dell'app, e prima di
+  installarne una che usa `shared/` gli si chiede conferma. I moderatori sono i
+  login in `ADMINS`; possono provare una versione sulla loro ORION prima di
+  approvarla, nascondere app e commenti, bannare.
+- **Pubblicare**: si sceglie il `.lua`; la cartella dati e' `data/<nome>/`
+  accanto, come nella card dell'emulatore, oppure una cartella col nome dello
+  script accanto a lui, come negli esempi della SDK (`doom.lua` + `doom/`).
+  Sottocartelle comprese; sulla card finisce sempre in `/apps/data/<nome>/`.
+  Ogni file ha la sua spunta: README, LEGGIMI e sorgenti `.py` sono fuori di
+  default, e dimensione e numero di file si ricontano a ogni spunta. Titolo, sommario, categoria,
+  versione e descrizione vengono dal commento in testa allo script
+  (`-- category:`, `-- version:`, `-- api:`), e si correggono nel modulo.
+  Controlli prima di inviare: nome valido per la card, script entro 32 KB,
+  pacchetto entro 4 MB.
+- **Sulla card**: `apps/<nome>.lua` e `apps/data/<nome>/`, nient'altro; lo
+  SHA-256 del pacchetto si verifica prima di scrivere. Un aggiornamento
+  sovrascrive i file del pacchetto e lascia cio' che l'app ha salvato da se'.
+  Le versioni installate dallo store sono in `apps/.store.json` (il launcher non
+  lo vede), da cui "update available". La pagina avvisa oltre le 15 app, il
+  massimo che il launcher mostra.
+- **Screenshot**: fino a 5 immagini PNG o JPEG per versione (1 MB l'una), fatte
+  dall'autore come preferisce, di solito catturando la finestra
+  dell'emulatore. Si aggiungono e si riordinano nel modulo di pubblicazione,
+  si moderano con la versione e compaiono nell'elenco (la prima), sulla pagina
+  dell'app (galleria, clic per ingrandire, frecce) e in coda. Un aggiornamento
+  senza immagini tiene quelle della versione approvata. Passano dal processo
+  principale come `data:`: la pagina accetta solo quelle (e ora anche gli avatar
+  di GitHub, che prima la CSP bloccava).
+- **L'emulatore di ORION dentro la Companion** (WebAssembly, lo stesso della
+  SDK: `make -C emulator web`, poi `npm run emu:copia`). Un modulo solo da 1,8 MB
+  con i suoni di sistema, caricato solo quando serve:
+  - **Try** sulla pagina di ogni app: la si prova senza ORION (non conta come
+    download, `?try=1`);
+  - **Try in emulator** in coda di moderazione: il moderatore prova la versione
+    in attesa senza la scheda;
+  - **Try in emulator** nel modulo di pubblicazione, sul `.lua` del disco, con
+    **Capture**: lo schermo (536x336 a 2x, PNG) va dritto negli screenshot.
+  Tasti come nell'emulatore della SDK (F1-F4, Alt = Fn) piu' i pulsanti MENU,
+  SAVE, SEARCH, PLAY, ESC; il log mostra `orion.sys.log` e gli errori Lua. La
+  CSP della pagina ora permette `wasm-unsafe-eval` e `connect-src data:`.
+- **Installare via Bluetooth**, senza cavo: se ORION non e' collegata in USB ma
+  lo e' via Bluetooth, Install, Update, Remove e la scheda Installed passano
+  dalla radio (`src/renderer/src/lib/storeBle.ts`). Stesse regole dell'USB, e
+  si mandano solo i file diversi da quelli gia' sulla card (dimensione e
+  CRC), quindi un aggiornamento muove solo cio' che e' cambiato. Avanzamento e
+  tempo stimato nella riga di stato; sopra il minuto (~0,5-1,3 kB/s) chiede
+  conferma e suggerisce il cavo. Pulsante "Connect over Bluetooth" dove serve.
+  Funziona col firmware dei betatester (con ORION sulla home); il firmware
+  0.3.0, in arrivo, permette anche di restare in Apps, ci mostra subito l'app
+  nuova e rifiuta di sovrascrivere un'app mentre gira.
+- Prove (repo privata, insieme al server): `npm run prova:store` — il Worker vero contro SQLite (100 controlli) e
+  i moduli della Companion contro il Worker in locale, con gli esempi della SDK
+  (36 controlli).
+
+**Note in Markdown.** Dal firmware del 25/11/2026 ORION chiede, a ogni nota
+nuova, se farla `.txt` o `.md`. La Companion ora le vede tutte e due.
+
+- Pagina Note: le `.md` compaiono nell'albero (con l'etichetta `MD`) e
+  l'anteprima ha il toggle **Rendered / Source**, ricordato fra una sessione e
+  l'altra. L'HTML e' ristretto (`src/renderer/src/lib/markdown.ts`): l'HTML
+  scritto dentro la nota esce come testo, i link e i `[[wiki link]]` sono solo
+  testo sottolineato, le immagini mostrano il loro testo alternativo.
+- Copia, sposta, rinomina (l'estensione resta quella), cancella e backup
+  accettano le `.md`; anche lo specchio Bluetooth le porta nei due versi.
+- Sync con **Obsidian**: una nota nuova che arriva dalla vault nasce sul
+  dispositivo come `.md`, quindi si vede renderizzata. Quelle gia' arrivate
+  come `.txt` restano `.txt`.
+- Sync con **Notion**: le `.md` del dispositivo si sincronizzano come le
+  altre; una pagina nuova da Notion resta `.txt` (il suo testo e' piano).
+- ⚠️ `foo.txt` e `foo.md` nella stessa cartella hanno la stessa chiave di
+  sincronizzazione: il sync la salta e dice di rinominarne una, invece di
+  sceglierne una a caso.
+
+**Wikipedia per ORION** (pagina nuova nella barra laterale). Si sceglie uno ZIM
+di Kiwix e la Companion lo converte nel formato dell'app `wiki` di ORION:
+testo ripulito e traslitterato per il pannello, link gia' risolti, indice dei
+titoli per la ricerca mentre si scrive, coordinate per cercare il posto in cui
+ci si trova. Va sulla card (`wiki/<nome>`) o in una cartella.
+
+- Il lettore ZIM e' in TypeScript puro (`src/main/wiki/zim.ts`, zstd con
+  `fzstd`): nessun modulo nativo da ricompilare. Gli ZIM vecchi in xz sono
+  rifiutati con un messaggio.
+- Sostituisce lo script Python della SDK (`zim2orion.py`), controllato byte per
+  byte sulla Wikipedia italiana "top" (50 002 articoli): indici identici e
+  testo identico per ogni articolo. Cinque volte piu' veloce (22 s contro 110).
+- Da riga di comando: `npm run wiki -- FILE.zim CARTELLA`.
+- ⚠️ Su ORION serve il firmware con l'API 0.3.0 (`file:seek`), in arrivo:
+  la pagina lo dice in alto, prima di convertire.
+
+
 ## [0.12.2] — 6 novembre 2026
 
 **La Companion e' pubblica.** Il sorgente sta nella cartella `companion/`

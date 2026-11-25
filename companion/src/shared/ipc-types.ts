@@ -1123,6 +1123,65 @@ export interface OrionAPI {
     onProgress: (cb: EbookProgressListener) => () => void;
   };
 
+  /** The App Store: Lua apps published by anyone, approved by a moderator,
+   *  downloaded, rated and commented by everyone (a Cloudflare Worker). */
+  store: {
+    /** The signed-in account, or null. Refreshed from the server when online. */
+    account: () => Promise<StoreAccount | null>;
+    /** Login with GitHub in the system browser (loopback, like Notion). */
+    signIn: () => Promise<StoreAccount>;
+    signOut: () => Promise<void>;
+    list: (req: StoreListRequest) => Promise<{ apps: StoreApp[] }>;
+    detail: (slug: string) => Promise<StoreDetailResponse>;
+    reviews: (slug: string) => Promise<{ reviews: StoreReview[] }>;
+    review: (req: StoreReviewRequest) => Promise<void>;
+    deleteReview: (slug: string) => Promise<void>;
+    report: (req: StoreReportRequest) => Promise<void>;
+    /** The apps on the card, and which version came from the store. */
+    installed: (mountPath: string) => Promise<StoreInstalledResponse>;
+    install: (req: StoreInstallRequest) => Promise<StoreInstallResponse>;
+    uninstall: (req: StoreUninstallRequest) => Promise<void>;
+    /** Choose an app's .lua on the computer and read it into a draft. */
+    pickSource: () => Promise<StorePublishDraft | null>;
+    /** Read again a source chosen before (after editing it). */
+    readSource: (luaPath: string) => Promise<StorePublishDraft>;
+    publish: (req: StorePublishRequest) => Promise<StorePublishResponse>;
+    /** Choose screenshot images (PNG/JPEG) on the computer, with previews. */
+    pickScreenshots: () => Promise<StoreShotFile[]>;
+    /** One screenshot of a version, as a data: URL (the page's CSP allows
+     *  only those, and a pending version's images need the token). */
+    screenshot: (slug: string, version: string, index: number) => Promise<string>;
+    /** A store app's package, for installing over Bluetooth (a download). */
+    packageFiles: (slug: string, version?: string) => Promise<StoreTryPackage>;
+    /** "Try": a store app's package for the emulator (not a download). */
+    tryFiles: (slug: string, version?: string) => Promise<StoreTryPackage>;
+    /** "Try in emulator" while publishing: the app as it is on disk. */
+    localFiles: (luaPath: string, exclude?: string[]) => Promise<StoreTryPackage>;
+    /** Keep an emulator capture (PNG data: URL) as a screenshot file. */
+    saveCapture: (dataUrl: string) => Promise<StoreShotFile>;
+    myApps: () => Promise<{ apps: StoreMyApp[] }>;
+    withdraw: (versionId: number) => Promise<void>;
+    // Moderators only (the server says no to everyone else).
+    queue: () => Promise<{ queue: StoreQueueItem[] }>;
+    decide: (req: StoreDecideRequest) => Promise<void>;
+    setHidden: (slug: string, hidden: boolean) => Promise<void>;
+    hideReview: (reviewId: number) => Promise<void>;
+    reports: () => Promise<{ reports: StoreReport[] }>;
+    resolveReport: (reportId: number) => Promise<void>;
+    ban: (login: string, banned: boolean) => Promise<void>;
+  };
+
+  wiki: {
+    /** What a ZIM says about itself, without converting. */
+    info: (zimPath: string) => Promise<WikiInfoResponse>;
+    /** Free bytes in a folder, -1 if unknown. */
+    space: (dir: string) => Promise<number>;
+    /** ZIM -> ORION Wiki folder. One at a time. */
+    convert: (req: WikiConvertRequest) => Promise<WikiConvertResponse>;
+    cancel: () => Promise<void>;
+    onProgress: (cb: WikiProgressListener) => () => void;
+  };
+
   video: {
     /** Verifica ffmpeg/ffprobe disponibili. */
     probeFfmpeg: () => Promise<FfmpegProbe>;
@@ -1250,4 +1309,272 @@ export interface CalendarioScriviResponse {
   errore?: string;
   percorso?: string;
   info?: CalendarioInfo;
+}
+
+/* ==========================================================================
+ *  Wikipedia: a Kiwix ZIM -> the ORION Wiki format (src/main/wiki)
+ * ========================================================================== */
+export interface WikiInfoResponse {
+  titolo: string;
+  lingua: string;
+  data: string;
+  descrizione: string;
+  articoli: number;
+  /** Bytes of the ZIM file. */
+  dimensione: number;
+}
+
+export interface WikiConvertRequest {
+  zimPath: string;
+  /** Mount point of ORION's card: the folder goes in <mount>/wiki/<nome>. */
+  mountPath?: string;
+  /** Or a folder on the computer: the folder goes in <localOutDir>/<nome>. */
+  localOutDir?: string;
+  /** Folder name, e.g. "it_top". */
+  nome: string;
+}
+
+export interface WikiConvertResponse {
+  outputPath: string;
+  articoli: number;
+  titoli: number;
+  geo: number;
+  byte: number;
+  secondi: number;
+}
+
+export interface WikiProgressEvent {
+  fase: "elenco" | "testo" | "indici" | "fatto";
+  fatti: number;
+  totale: number;
+}
+
+export type WikiProgressListener = (ev: WikiProgressEvent) => void;
+
+// ===========================================================================
+//  App Store (src/main/store, server in store/)
+// ===========================================================================
+
+export const STORE_CATEGORIES = ["games", "office", "utility", "radio", "music", "dev", "other"] as const;
+export type StoreCategory = (typeof STORE_CATEGORIES)[number];
+
+/** What the server can tell from an app's code; shown before installing.
+ *  `shared` = reads and writes the whole card. */
+export type StoreFlag = "shared" | "serial" | "gpio" | "i2c" | "ble" | "mesh" | "compiled";
+
+export interface StoreAccount {
+  login: string;
+  avatar: string | null;
+  admin: boolean;
+}
+
+export interface StoreListRequest {
+  q?: string;
+  category?: string;
+  sort?: "popular" | "rating" | "new";
+}
+
+export interface StoreApp {
+  slug: string;
+  title: string;
+  summary: string;
+  category: string;
+  author: string;
+  version: string | null;
+  minApi: string | null;
+  size: number | null;
+  sha256: string | null;
+  flags: StoreFlag[];
+  /** Average of the stars, one decimal; null with no votes. */
+  rating: number | null;
+  ratings: number;
+  downloads: number;
+  updatedAt: string;
+  /** How many screenshots the shown version has. */
+  screenshots: number;
+}
+
+export interface StoreAppDetail extends StoreApp {
+  description: string;
+  hidden: boolean;
+  public: boolean;
+  isOwner: boolean;
+}
+
+export interface StoreVersion {
+  id: number;
+  version: string;
+  status: "pending" | "approved" | "rejected";
+  changelog: string;
+  rejectReason?: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  screenshots: number;
+}
+
+export interface StoreDetailResponse {
+  app: StoreAppDetail;
+  versions: StoreVersion[];
+  /** Votes with 1..5 stars, in this order. */
+  histogram: number[];
+  myReview: { stars: number; body: string } | null;
+}
+
+export interface StoreReview {
+  id: number;
+  login: string;
+  avatar: string | null;
+  stars: number;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoreReviewRequest {
+  slug: string;
+  stars: number;
+  body: string;
+}
+
+export interface StoreReportRequest {
+  slug: string;
+  reason: string;
+}
+
+export interface StoreInstalled {
+  slug: string;
+  /** The store version installed by the Companion; null if the app was
+   *  copied by hand (or is not from the store). */
+  version: string | null;
+  hasData: boolean;
+}
+
+export interface StoreInstalledResponse {
+  apps: StoreInstalled[];
+  /** How many scripts the launcher can list (SCRIPT_MAX - 1 in app_launcher.c). */
+  limit: number;
+}
+
+export interface StoreInstallRequest {
+  mountPath: string;
+  slug: string;
+  /** Only for the author or a moderator: a version not yet approved. */
+  version?: string;
+}
+
+export interface StoreInstallResponse {
+  version: string;
+  written: string[];
+}
+
+export interface StoreUninstallRequest {
+  mountPath: string;
+  slug: string;
+  /** Also delete /apps/data/<slug>/: the app's saved data and assets. */
+  removeData: boolean;
+}
+
+export interface StoreManifest {
+  slug: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  version: string;
+  changelog: string;
+  minApi: string;
+}
+
+/** An app read from the computer, ready to be completed and published. */
+export interface StorePublishDraft extends StoreManifest {
+  luaPath: string;
+  /** Every file found; `excluded` = left out of the package (the author
+   *  can change it: README, sources and tools are out by default). */
+  files: { path: string; size: number; excluded: boolean }[];
+  totalSize: number;
+  flags: StoreFlag[];
+  /** Problems that block publishing (bad name, script over 32 KB...). */
+  errors: string[];
+  /** Things worth knowing (files skipped, no data folder...). */
+  warnings: string[];
+}
+
+export interface StorePublishRequest {
+  luaPath: string;
+  manifest: StoreManifest;
+  /** Data paths left out of the package (StorePublishDraft.files). */
+  exclude: string[];
+  /** Image files, in the order shown. Empty on an update: the approved
+   *  version's screenshots carry over. */
+  screenshots: string[];
+}
+
+export interface StorePublishResponse {
+  slug: string;
+  version: string;
+  status: "pending";
+  flags: StoreFlag[];
+  screenshots: number;
+  screenshotsInherited: boolean;
+}
+
+/** An app's files as the store packs them: `<slug>.lua` and `data/...`. */
+export interface StoreTryPackage {
+  slug: string;
+  version: string;
+  files: { path: string; b64: string }[];
+}
+
+export interface StoreShotFile {
+  path: string;
+  size: number;
+  /** Preview, data: URL. Empty when the file is refused. */
+  dataUrl: string;
+  /** Why it cannot be sent (not PNG/JPEG, over 1 MB...). */
+  error?: string;
+}
+
+export interface StoreMyApp {
+  slug: string;
+  title: string;
+  hidden: boolean;
+  public: boolean;
+  downloads: number;
+  rating: number | null;
+  ratings: number;
+  versions: { id: number; version: string; status: StoreVersion["status"]; rejectReason: string | null; createdAt: string }[];
+}
+
+export interface StoreQueueItem {
+  id: number;
+  slug: string;
+  version: string;
+  author: string;
+  isNew: boolean;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  changelog: string;
+  minApi: string | null;
+  size: number;
+  sha256: string;
+  flags: StoreFlag[];
+  screenshots: number;
+  createdAt: string;
+}
+
+export interface StoreDecideRequest {
+  versionId: number;
+  action: "approve" | "reject";
+  reason?: string;
+}
+
+export interface StoreReport {
+  id: number;
+  slug: string;
+  title: string;
+  login: string;
+  reason: string;
+  createdAt: string;
 }

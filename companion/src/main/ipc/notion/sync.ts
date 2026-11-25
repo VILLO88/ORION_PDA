@@ -1,5 +1,5 @@
 /**
- * Sync bidirezionale tra le note del device (<mount>/NOTE/, file .txt) e Notion
+ * Sync bidirezionale tra le note del device (<mount>/NOTE/, file .txt o .md) e Notion
  * (sottopagine sotto una pagina genitore scelta dall'utente).
  *
  * Stesso modello del sync Obsidian (vedi ../obsidian.ts): manifest dell'ultimo
@@ -11,7 +11,10 @@
  * Mappa filesystem ↔ Notion:
  *  - relKey = catena di nomi senza estensione, separatori "/" (es. "ideas/foo");
  *  - cartella device ↔ child_page "contenitore" (ha sottopagine);
- *  - nota .txt ↔ child_page foglia (senza sottopagine), contenuto = paragrafi.
+ *  - nota .txt o .md ↔ child_page foglia (senza sottopagine), contenuto =
+ *    paragrafi. Una pagina nuova da Notion nasce `.txt`: il suo testo e'
+ *    piano, non Markdown. `foo.txt` e `foo.md` insieme sul dispositivo hanno
+ *    la stessa chiave: la chiave si salta con un errore (vedi ../obsidian.ts).
  */
 
 import { app } from "electron";
@@ -162,12 +165,17 @@ async function collectDevice(
   mountPath: string,
   noteRoot: string,
   aperto: boolean,
-): Promise<Map<string, DeviceNote>> {
+): Promise<{ map: Map<string, DeviceNote>; doppie: Set<string> }> {
   const out = new Map<string, DeviceNote>();
+  const doppie = new Set<string>();
+  const viste = new Set<string>();
   const { notes } = await listNotes({ mountPath });
   for (const n of notes) {
     const protetta = n.protected || isProtectedKey(toKey(n.relPath));
     if (protetta && !aperto) continue;
+    const k = toKey(n.relPath);
+    if (viste.has(k)) doppie.add(k);
+    viste.add(k);
     try {
       const raw = await readFile(n.devicePath);
       let text: string;
@@ -189,7 +197,7 @@ async function collectDevice(
       /* skip */
     }
   }
-  return out;
+  return { map: out, doppie };
 }
 
 /** Ritorna le note (foglie) e la mappa cartella→pageId trovate sotto rootId. */
@@ -268,7 +276,7 @@ export async function syncNotion(
   const next: Manifest["entries"] = {};
 
   const aperto = vaultUnlocked(noteRoot);
-  const deviceMap = await collectDevice(req.mountPath, noteRoot, aperto);
+  const { map: deviceMap, doppie } = await collectDevice(req.mountPath, noteRoot, aperto);
   const { notes: notionMap, folders } = await collectNotion(rootId, aperto);
 
   const res: NotionSyncResponse = {
@@ -285,6 +293,14 @@ export async function syncNotion(
   const keys = new Set<string>([...deviceMap.keys(), ...notionMap.keys()]);
 
   for (const key of keys) {
+    if (doppie.has(key)) {
+      res.errors.push({
+        relKey: key,
+        message: `Both "${key}.txt" and "${key}.md" are on the device: rename one of them.`,
+      });
+      if (prev[key]) next[key] = prev[key];
+      continue;
+    }
     try {
       const d = deviceMap.get(key);
       const n = notionMap.get(key);

@@ -1,5 +1,5 @@
 import { useState, type FC } from "react";
-import { BookOpen, Calendar, Cpu, FolderOpen, Home, LifeBuoy, Music2, StickyNote, Video, Zap, type LucideIcon } from "lucide-react";
+import { BookOpen, Calendar, Cpu, FolderOpen, Globe, Home, LifeBuoy, Music2, StickyNote, Store, Video, Zap, type LucideIcon } from "lucide-react";
 import { useDevices } from "@/lib/DeviceContext";
 import logoUrl from "../../../../media/logo.png";
 
@@ -14,10 +14,12 @@ export const SIDEBAR_ITEMS = [
   { key: "device",   label: "Device",   icon: Cpu },
   { key: "notes",    label: "Notes",    icon: StickyNote },
   { key: "ebooks",   label: "Ebooks",   icon: BookOpen },
+  { key: "wiki",     label: "Wikipedia", icon: Globe },
   { key: "music",    label: "Music",    icon: Music2 },
   { key: "video",    label: "Video",    icon: Video },
   { key: "calendar", label: "Calendar", icon: Calendar },
   { key: "files",    label: "Files",    icon: FolderOpen },
+  { key: "store",    label: "App Store", icon: Store },
   { key: "firmware", label: "Firmware", icon: Zap },
 ] as const satisfies readonly SidebarItem[];
 

@@ -100,6 +100,11 @@ import type {
   VideoProbeResponse,
   VideoProgressEvent,
   VideoProgressListener,
+  WikiConvertRequest,
+  WikiConvertResponse,
+  WikiInfoResponse,
+  WikiProgressEvent,
+  WikiProgressListener,
 } from "../shared/ipc-types";
 
 const api: OrionAPI = {
@@ -253,6 +258,52 @@ const api: OrionAPI = {
         cb(ev as EbookProgressEvent);
       ipcRenderer.on("ebook:progress", handler);
       return () => ipcRenderer.removeListener("ebook:progress", handler);
+    },
+  },
+
+  store: {
+    account: () => ipcRenderer.invoke("store:account"),
+    signIn: () => ipcRenderer.invoke("store:signIn"),
+    signOut: () => ipcRenderer.invoke("store:signOut"),
+    list: (req) => ipcRenderer.invoke("store:list", req),
+    detail: (slug) => ipcRenderer.invoke("store:detail", slug),
+    reviews: (slug) => ipcRenderer.invoke("store:reviews", slug),
+    review: (req) => ipcRenderer.invoke("store:review", req),
+    deleteReview: (slug) => ipcRenderer.invoke("store:deleteReview", slug),
+    report: (req) => ipcRenderer.invoke("store:report", req),
+    installed: (mountPath) => ipcRenderer.invoke("store:installed", mountPath),
+    install: (req) => ipcRenderer.invoke("store:install", req),
+    uninstall: (req) => ipcRenderer.invoke("store:uninstall", req),
+    pickSource: () => ipcRenderer.invoke("store:pickSource"),
+    readSource: (p) => ipcRenderer.invoke("store:readSource", p),
+    publish: (req) => ipcRenderer.invoke("store:publish", req),
+    pickScreenshots: () => ipcRenderer.invoke("store:pickScreenshots"),
+    screenshot: (slug, version, index) => ipcRenderer.invoke("store:screenshot", slug, version, index),
+    tryFiles: (slug, version) => ipcRenderer.invoke("store:tryFiles", slug, version),
+    packageFiles: (slug, version) => ipcRenderer.invoke("store:packageFiles", slug, version),
+    localFiles: (p, ex) => ipcRenderer.invoke("store:localFiles", p, ex),
+    saveCapture: (d) => ipcRenderer.invoke("store:saveCapture", d),
+    myApps: () => ipcRenderer.invoke("store:myApps"),
+    withdraw: (id) => ipcRenderer.invoke("store:withdraw", id),
+    queue: () => ipcRenderer.invoke("store:queue"),
+    decide: (req) => ipcRenderer.invoke("store:decide", req),
+    setHidden: (slug, hidden) => ipcRenderer.invoke("store:setHidden", slug, hidden),
+    hideReview: (id) => ipcRenderer.invoke("store:hideReview", id),
+    reports: () => ipcRenderer.invoke("store:reports"),
+    resolveReport: (id) => ipcRenderer.invoke("store:resolveReport", id),
+    ban: (login, banned) => ipcRenderer.invoke("store:ban", login, banned),
+  },
+  wiki: {
+    info: (zimPath: string) =>
+      ipcRenderer.invoke("wiki:info", zimPath) as Promise<WikiInfoResponse>,
+    space: (dir: string) => ipcRenderer.invoke("wiki:space", dir) as Promise<number>,
+    convert: (req: WikiConvertRequest) =>
+      ipcRenderer.invoke("wiki:convert", req) as Promise<WikiConvertResponse>,
+    cancel: () => ipcRenderer.invoke("wiki:cancel") as Promise<void>,
+    onProgress: (cb: WikiProgressListener) => {
+      const handler = (_e: unknown, ev: unknown) => cb(ev as WikiProgressEvent);
+      ipcRenderer.on("wiki:progress", handler);
+      return () => ipcRenderer.removeListener("wiki:progress", handler);
     },
   },
 

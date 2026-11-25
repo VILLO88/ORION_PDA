@@ -77,7 +77,9 @@ function crc32(dati: Uint8Array): number {
 /** Ciò che dello specchio viaggia: le note, e il deposito delle protette. */
 function eNota(nome: string): boolean {
   const n = nome.toLowerCase();
-  return n.endsWith(".txt") || n.endsWith(".enc");
+  /* `.md` dal firmware del 25/11/2026. La bozza di una `.md` sul
+     dispositivo e' `nome.md.tmp`: finisce in `.tmp`, quindi resta fuori. */
+  return n.endsWith(".txt") || n.endsWith(".md") || n.endsWith(".enc");
 }
 
 async function leggiFotografia(): Promise<BleSnapshot | null> {

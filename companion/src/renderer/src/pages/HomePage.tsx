@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type FC } from "react";
 import {
   ArrowRight,
+  Globe,
+  Store,
   RefreshCw,
   BookOpen,
   Music2,
@@ -166,6 +168,8 @@ const KIND_ICON: Record<ActivityKind, typeof BookOpen> = {
   "files-upload":    FolderOpen,
   "files-delete":    FolderOpen,
   "firmware-flash":  Zap,
+  "wiki-convert":    Globe,
+  "store-install":   Store,
 };
 
 const RecentActivity: FC<{ items: ActivityEntry[]; onClear: () => void }> = ({

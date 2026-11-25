@@ -48,6 +48,19 @@ export const VAULT_ID_FILE = ".orion_vault_id";
 export const PROTECTED_DIR = "PRIVATE";
 export const PROTECTED_EXT = ".enc";
 
+/**
+ * Le estensioni di una nota normale. Dal firmware del 25/11/2026 una nota
+ * nuova puo' essere `.txt` o `.md` (lo sceglie l'utente sul dispositivo, che
+ * per le `.md` ha un'anteprima renderizzata). Il contenuto e' lo stesso:
+ * UTF-8, una riga per riga. Dentro `PRIVATE` resta solo `.enc`.
+ */
+export const PLAIN_EXTS = [".txt", ".md"] as const;
+
+/** true se `ext` (minuscola, col punto) e' quella di una nota normale. */
+export function isPlainNoteExt(ext: string): boolean {
+  return (PLAIN_EXTS as readonly string[]).includes(ext.toLowerCase());
+}
+
 const VAULT_BYTES = 88;
 const NOTE_OVERHEAD = 8 + 12 + 16; // intestazione, nonce, tag
 const NOTE_HEADER = Buffer.from([0x4f, 0x52, 0x4e, 0x4e, 1, 0, 0, 0]); // "ORNN" 1
@@ -389,6 +402,7 @@ export const DEVICE_FOLDER_MAX = 23;
 
 /**
  * Dove sta sul dispositivo la nota di una chiave di sincronizzazione.
+ * `ext` vale per una nota normale; dentro `PRIVATE` e' sempre `.enc`.
  *
  * ⚠️ Rifiuta i nomi che il dispositivo non sa riaprire. Il firmware tiene il
  * titolo in un buffer e da quello ricostruisce il percorso: una nota col nome
@@ -396,7 +410,7 @@ export const DEVICE_FOLDER_MAX = 23;
  * nota nata in Obsidian). Meglio un errore qui, che dice quale nota e perché,
  * di un file sulla microSD che si può solo guardare.
  */
-export function deviceNotePath(noteRoot: string, key: string): string {
+export function deviceNotePath(noteRoot: string, key: string, ext: ".txt" | ".md" = ".txt"): string {
   const pezzi = key.split("/");
   const titolo = pezzi[pezzi.length - 1];
   if (titolo.length > DEVICE_TITLE_MAX) {
@@ -410,7 +424,7 @@ export function deviceNotePath(noteRoot: string, key: string): string {
       `Folder name too long for the device ("${lunga}", max ${DEVICE_FOLDER_MAX} characters).`,
     );
   }
-  return join(noteRoot, ...key.split("/")) + (isProtectedKey(key) ? PROTECTED_EXT : ".txt");
+  return join(noteRoot, ...key.split("/")) + (isProtectedKey(key) ? PROTECTED_EXT : ext);
 }
 
 /** I byte da scrivere sul dispositivo per `testo` destinato a `target`:

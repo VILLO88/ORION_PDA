@@ -13,8 +13,10 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardPaste,
+  Code,
   Copy,
   Download,
+  Eye,
   FileText,
   Folder,
   FolderOpen,
@@ -36,6 +38,7 @@ import { bleCondiviso } from "@/lib/bleOrion";
 import { bleNoteAllinea, bleNoteAllineato, bleNoteSpingi } from "@/lib/bleNote";
 import { useBle } from "@/lib/useBle";
 import { chiediDepositoAOrion, ripristinaDepositoSuOrion } from "@/lib/serialVault";
+import { eMarkdown, markdownInHtml } from "@/lib/markdown";
 import type {
   NoteTreeFile,
   NoteTreeFolder,
@@ -45,6 +48,10 @@ import type {
 const DND_MIME = "application/x-orion-notes";
 const OBSIDIAN_VAULT_KEY = "orion.obsidian.vault";
 const SYNC_PROVIDER_KEY = "orion.sync.provider";
+/* Come si mostra una nota `.md`: renderizzata o com'e' scritta. Una scelta
+   sola per tutte, ricordata fra una sessione e l'altra. */
+const MD_VIEW_KEY = "orion.notes.mdView";
+type MdView = "rendered" | "source";
 
 type SyncProvider = "obsidian" | "notion";
 
@@ -150,6 +157,18 @@ const NotesPage = () => {
   const [selected, setSelected] = useState<NoteTreeNode | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [mdView, setMdViewState] = useState<MdView>(
+    () => (localStorage.getItem(MD_VIEW_KEY) === "source" ? "source" : "rendered"),
+  );
+  const setMdView = (v: MdView) => {
+    setMdViewState(v);
+    localStorage.setItem(MD_VIEW_KEY, v);
+  };
+  const selezionataMd = !!selected && selected.kind === "file" && eMarkdown(selected.name);
+  const previewHtml = useMemo(
+    () => (selezionataMd && mdView === "rendered" && !previewLoading ? markdownInHtml(preview) : ""),
+    [selezionataMd, mdView, preview, previewLoading],
+  );
   const [defaultDir, setDefaultDir] = useState<string>("");
   const [vaultPath, setVaultPath] = useState<string>(
     () => localStorage.getItem(OBSIDIAN_VAULT_KEY) ?? "",
@@ -222,7 +241,7 @@ const NotesPage = () => {
     void reload();
   }, [reload]);
 
-  // Preview of selected .txt
+  // Preview of the selected note (.txt, .md, or .enc decrypted)
   useEffect(() => {
     if (!selected || selected.kind !== "file") {
       setPreview("");
@@ -1014,6 +1033,38 @@ const NotesPage = () => {
                     {selected.protected ? " · encrypted on the device" : ""}
                   </p>
                 </div>
+                {selezionataMd && (
+                  /* Il toggle dell'anteprima, come sul dispositivo (MENU >
+                     Markdown preview) e come in VS Code. */
+                  <div className="mr-2 inline-flex overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setMdView("rendered")}
+                      className={`inline-flex items-center gap-1 px-2 py-1 text-xs ${
+                        mdView === "rendered"
+                          ? "bg-accent-soft text-accent"
+                          : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      }`}
+                      title="Show the Markdown rendered"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Rendered
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMdView("source")}
+                      className={`inline-flex items-center gap-1 border-l border-zinc-200 px-2 py-1 text-xs dark:border-zinc-800 ${
+                        mdView === "source"
+                          ? "bg-accent-soft text-accent"
+                          : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      }`}
+                      title="Show the Markdown as written"
+                    >
+                      <Code className="h-3.5 w-3.5" />
+                      Source
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => void onBackupOne(selected)}
@@ -1024,9 +1075,17 @@ const NotesPage = () => {
                   Backup
                 </button>
               </div>
-              <pre className="flex-1 overflow-auto whitespace-pre-wrap p-4 font-mono text-sm text-zinc-800 dark:text-zinc-100">
-                {previewLoading ? "Loading…" : preview}
-              </pre>
+              {selezionataMd && mdView === "rendered" && !previewLoading ? (
+                /* HTML ristretto: vedi lib/markdown.ts. */
+                <div
+                  className="md-preview flex-1 overflow-auto p-4 text-sm text-zinc-800 dark:text-zinc-100"
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              ) : (
+                <pre className="flex-1 overflow-auto whitespace-pre-wrap p-4 font-mono text-sm text-zinc-800 dark:text-zinc-100">
+                  {previewLoading ? "Loading…" : preview}
+                </pre>
+              )}
             </>
           )}
         </div>
@@ -1314,6 +1373,11 @@ const FileRow = ({
       <span className="h-4 w-4" />
       <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
       <span className="truncate">{node.name}</span>
+      {eMarkdown(node.name) && (
+        <span className="ml-1 shrink-0 rounded bg-zinc-100 px-1 font-mono text-[10px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+          MD
+        </span>
+      )}
     </div>
   );
 };
